@@ -26,6 +26,10 @@ CONTAINER_NAME = "openhands-gepa-demo"
 LOCAL_URL = "http://127.0.0.1:15000"
 PORT = 8080
 
+# Base path for reverse proxy (e.g., "/mcp" when behind Tailscale Funnel)
+# This rewrites SSE endpoint URLs so MCP clients can find /messages/
+BASE_PATH = os.getenv("MCP_BASE_PATH", "/mcp")
+
 # Disable DNS rebinding protection to allow Tailscale Funnel access
 transport_security = TransportSecuritySettings(
     enable_dns_rebinding_protection=False
@@ -229,6 +233,48 @@ def get_all_service_status() -> str:
     return json.dumps(result, indent=2)
 
 
+class BasePathMiddleware:
+    """ASGI middleware for reverse proxy subpath support (e.g., /mcp).
+
+    Handles two directions:
+    - Outbound: Rewrites SSE endpoint paths /messages/ → /mcp/messages/
+      so clients behind the proxy resolve the correct POST URL.
+    - Inbound: Strips /mcp prefix from incoming requests so /mcp/messages/
+      reaches the /messages/ handler (needed for direct local connections).
+    """
+
+    def __init__(self, app, base_path: str):
+        self.app = app
+        self.base_path = base_path.rstrip("/")
+
+    async def __call__(self, scope, receive, send):
+        if not self.base_path:
+            return await self.app(scope, receive, send)
+
+        # Inbound: strip base path prefix from incoming requests
+        if scope["type"] == "http":
+            path = scope.get("path", "")
+            if path.startswith(self.base_path + "/"):
+                scope = dict(scope)
+                scope["path"] = path[len(self.base_path):]
+
+        # Outbound: rewrite SSE data to include base path in messages URL
+        async def rewrite_send(message):
+            if message.get("type") == "http.response.body":
+                body = message.get("body", b"")
+                if body:
+                    text = body.decode("utf-8", errors="replace")
+                    if "/messages/" in text:
+                        text = text.replace(
+                            "/messages/",
+                            f"{self.base_path}/messages/",
+                        )
+                        message = {**message, "body": text.encode("utf-8")}
+            await send(message)
+
+        await self.app(scope, receive, rewrite_send)
+
+
 if __name__ == "__main__":
     # Run with uvicorn for HTTP access
     import uvicorn
@@ -237,6 +283,7 @@ if __name__ == "__main__":
     from starlette.routing import Route, Mount
 
     print(f"Starting MCP Server on http://0.0.0.0:{PORT}")
+    print(f"Base path: {BASE_PATH or '(none)'}")
     print(f"SSE endpoint: http://0.0.0.0:{PORT}/sse")
     print(f"Expose with: tailscale funnel {PORT}")
     print()
@@ -269,5 +316,9 @@ if __name__ == "__main__":
             Mount("/", app=sse_app),
         ],
     )
+
+    # Apply base path middleware for reverse proxy support
+    if BASE_PATH:
+        app = BasePathMiddleware(app, BASE_PATH)
 
     uvicorn.run(app, host="0.0.0.0", port=PORT)
