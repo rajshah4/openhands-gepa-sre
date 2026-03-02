@@ -70,43 +70,46 @@ SCENARIOS = {
 **Endpoint**: `/service1`
 **Status**: HTTP 500 Internal Server Error
 **Time Detected**: {timestamp}
-**Expected Risk Level**: MEDIUM (requires file deletion)
 
 ### Symptoms
 - Health endpoint returning 500 status code
-- Error message indicates: "stale lockfile present at /tmp/service.lock"
-- Service was healthy before last deployment
-
-### Verification
-```bash
-curl {target_url}
-```
-
-### Logs
-```
-[ERROR] Service startup blocked by existing lockfile
-[ERROR] /tmp/service.lock exists but owning process is not running
-[ERROR] Health check failed: stale lockfile present
-```
+- Error message: "stale lockfile present at /tmp/service.lock"
 
 ### Expected Behavior
 Service should return HTTP 200 with `"status": "ok"`.
 
-### Environment
-- Container: `openhands-gepa-demo`
-- Target URL: `{target_url}`
-
 ---
 
-**⚠️ REQUIRED: You must use the MCP tools to fix this live service. Do NOT just write documentation.**
+## ⚠️ You MUST use MCP tools to fix this. They are in your tool list right now.
 
-**Step-by-step (all steps required):**
-1. Call `diagnose_service1` MCP tool to confirm the issue
-2. Call `fix_service1` MCP tool to **actually remove the lockfile** (MEDIUM risk - auto-approved per AGENTS.md)
-3. Call `get_all_service_status` MCP tool to **verify service1 now returns HTTP 200**
-4. Only after confirming the fix worked, create a PR documenting what you did
+The MCP tools (`get_all_service_status`, `diagnose_service1`, `fix_service1`) are available in your tool list. They execute remotely — you do not need Docker or shell access. Just call them like any other tool.
 
-**The service is currently broken. Your job is to fix it, not just document it.**
+**Do these steps in order. Paste the raw JSON output from each tool call as proof.**
+
+### Step 1: Call `get_all_service_status`
+Paste the JSON output here. You should see service1 with `"http_code": "500"`.
+
+### Step 2: Call `diagnose_service1`
+Paste the JSON output here. You should see `"lock_file_exists": true`.
+
+### Step 3: Call `fix_service1`
+This is the critical step — it removes the lockfile. MEDIUM risk, auto-approved per AGENTS.md.
+Paste the JSON output here. You MUST see `"fixed": true` and `"post_http_status": "200"`.
+
+### Step 4: Call `get_all_service_status` again
+Paste the JSON output here. You should see service1 with `"http_code": "200"`.
+
+### Step 5: Create a PR with the incident report
+Only after Step 4 confirms HTTP 200. Include the raw tool outputs in the PR.
+
+**If you cannot paste real tool output, the fix was not applied and the service is still broken.**
+
+### Pre-flight verification
+The MCP pipeline was verified working before this issue was created:
+```
+$ uv run python scripts/test_mcp_agent.py
+✅ fix_service1 returned {{"fixed": true, "post_http_status": "200"}}
+```
 """,
     },
     "readiness_probe_fail": {
@@ -118,42 +121,39 @@ Service should return HTTP 200 with `"status": "ok"`.
 **Endpoint**: `/service2`
 **Status**: HTTP 500 - Readiness probe failure
 **Time Detected**: {timestamp}
-**Expected Risk Level**: LOW (read-only diagnosis + file creation)
 
 ### Symptoms
 - Readiness probe returning 500 status
-- Service appears to have started but is not ready to serve traffic
-- Missing readiness flag file
-
-### Verification
-```bash
-curl {target_url}
-```
-
-### Logs
-```
-[ERROR] Readiness check failed: /tmp/ready.flag not found
-[ERROR] Service started but readiness conditions not met
-```
+- Missing readiness flag file at `/tmp/ready.flag`
 
 ### Expected Behavior
 Service should return HTTP 200 with `"status": "ok"`.
 
-### Environment
-- Container: `openhands-gepa-demo`
-- Target URL: `{target_url}`
-
 ---
 
-**⚠️ REQUIRED: You must use the MCP tools to fix this live service. Do NOT just write documentation.**
+## ⚠️ You MUST use MCP tools to fix this. They are in your tool list right now.
 
-**Step-by-step (all steps required):**
-1. Call `diagnose_service2` MCP tool to confirm the issue
-2. Call `fix_service2` MCP tool to **actually create the readiness flag** (LOW risk)
-3. Call `get_all_service_status` MCP tool to **verify service2 now returns HTTP 200**
-4. Only after confirming the fix worked, create a PR documenting what you did
+The MCP tools (`get_all_service_status`, `diagnose_service2`, `fix_service2`) are available in your tool list. They execute remotely — you do not need Docker or shell access. Just call them like any other tool.
 
-**The service is currently broken. Your job is to fix it, not just document it.**
+**Do these steps in order. Paste the raw JSON output from each tool call as proof.**
+
+### Step 1: Call `get_all_service_status`
+Paste the JSON output here. You should see service2 with `"http_code": "500"`.
+
+### Step 2: Call `diagnose_service2`
+Paste the JSON output here. You should see `"ready_flag_exists": false`.
+
+### Step 3: Call `fix_service2`
+This creates the readiness flag. LOW risk.
+Paste the JSON output here. You MUST see `"fixed": true` and `"post_http_status": "200"`.
+
+### Step 4: Call `get_all_service_status` again
+Paste the JSON output here. You should see service2 with `"http_code": "200"`.
+
+### Step 5: Create a PR with the incident report
+Only after Step 4 confirms HTTP 200. Include the raw tool outputs in the PR.
+
+**If you cannot paste real tool output, the fix was not applied and the service is still broken.**
 """,
     },
     "corrupted_data_store": {
