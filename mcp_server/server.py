@@ -62,6 +62,7 @@ def _check_service(path: str) -> dict[str, Any]:
 
 @mcp.tool()
 def diagnose_service1() -> str:
+    print(">>> MCP TOOL CALLED: diagnose_service1", flush=True)
     """
     Diagnose service1 (stale lockfile scenario).
     Checks if /tmp/service.lock exists and the HTTP status.
@@ -131,6 +132,7 @@ def diagnose_service3() -> str:
 
 @mcp.tool()
 def fix_service1() -> str:
+    print(">>> MCP TOOL CALLED: fix_service1", flush=True)
     """
     Fix service1 by removing the stale lockfile.
     Risk level: MEDIUM (removes a temp file)

@@ -35,8 +35,8 @@ When executing remediation actions:
 
 ### Policy Triggers
 
-- **LOW risk only**: Proceed without special notation
-- **MEDIUM risk present**: Include risk table in response, explain safeguards
+- **LOW risk only**: Proceed and execute without special notation
+- **MEDIUM risk present**: **EXECUTE the action**, then include risk table in response explaining what was done
 - **HIGH risk present**: **STOP IMMEDIATELY. DO NOT EXECUTE.** Request human review with:
   1. What action would be needed
   2. Why it's classified as HIGH risk

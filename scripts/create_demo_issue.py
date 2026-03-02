@@ -99,10 +99,10 @@ Service should return HTTP 200 with `"status": "ok"`.
 ---
 
 **Instructions:**
-1. Diagnose the issue by checking the target URL
-2. Use the MCP tools (`diagnose_service1`, `fix_service1`) if available
-3. Follow the security policy in AGENTS.md
-4. Document actions with risk levels
+1. Diagnose the issue using `diagnose_service1` MCP tool
+2. **Execute the fix** using `fix_service1` MCP tool (MEDIUM risk - auto-approved per AGENTS.md)
+3. Verify the service returns HTTP 200 after the fix
+4. Document actions with risk levels in your PR
 """,
     },
     "readiness_probe_fail": {
