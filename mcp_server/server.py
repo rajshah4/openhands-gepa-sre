@@ -251,12 +251,19 @@ class BasePathMiddleware:
         if not self.base_path:
             return await self.app(scope, receive, send)
 
-        # Inbound: strip base path prefix from incoming requests
+        # Inbound: handle path rewriting for reverse proxy
         if scope["type"] == "http":
             path = scope.get("path", "")
+            method = scope.get("method", "GET")
             if path.startswith(self.base_path + "/"):
+                # Strip prefix: /mcp/messages/... → /messages/...
                 scope = dict(scope)
                 scope["path"] = path[len(self.base_path):]
+            elif path == "/" and method in ("POST", "DELETE"):
+                # Root POST/DELETE → route to streamable HTTP at /mcp
+                # (Tailscale stripped /mcp, we add it back)
+                scope = dict(scope)
+                scope["path"] = self.base_path
 
         # Outbound: rewrite SSE data to include base path in messages URL
         async def rewrite_send(message):
@@ -293,15 +300,20 @@ if __name__ == "__main__":
     print("  - get_all_service_status")
     print()
 
-    # Get the MCP SSE app
+    # Use streamable HTTP app as primary (has proper lifespan/task group).
+    # This handles POST/GET/DELETE at /mcp for the streamable HTTP transport.
+    # OpenHands Cloud uses: https://host/mcp → Tailscale strips /mcp → arrives as /
+    # The BasePathMiddleware rewrites incoming / back to /mcp for the handler.
+    http_app = mcp.streamable_http_app()
+
+    # Also get SSE app for backward compatibility
     sse_app = mcp.sse_app()
 
-    # Health check endpoint at root - OpenHands Cloud probes this
     async def health(request):
         return JSONResponse({
             "status": "ok",
             "server": "sre-demo",
-            "sse_endpoint": "/sse",
+            "transports": {"streamable_http": "/mcp", "sse": "/sse"},
             "tools": [
                 "diagnose_service1", "diagnose_service2", "diagnose_service3",
                 "fix_service1", "fix_service2", "fix_service3",
@@ -309,13 +321,27 @@ if __name__ == "__main__":
             ],
         })
 
-    # Wrap MCP app with a root health endpoint
-    app = Starlette(
-        routes=[
-            Route("/", health),
-            Mount("/", app=sse_app),
-        ],
-    )
+    # Add health and SSE routes to the streamable HTTP app
+    http_app.routes.insert(0, Route("/", health))
+    http_app.routes.append(Mount("/sse-transport", app=sse_app))
+
+    app = http_app
+
+    # Route SSE paths (/sse, /messages/) to SSE transport app
+    class DualTransportApp:
+        """Routes requests to SSE or streamable HTTP transport."""
+        def __init__(self, primary, sse):
+            self.primary = primary
+            self.sse = sse
+
+        async def __call__(self, scope, receive, send):
+            if scope["type"] == "http":
+                path = scope.get("path", "")
+                if path == "/sse" or path.startswith("/messages"):
+                    return await self.sse(scope, receive, send)
+            return await self.primary(scope, receive, send)
+
+    app = DualTransportApp(app, sse_app)
 
     # Apply base path middleware for reverse proxy support
     if BASE_PATH:
