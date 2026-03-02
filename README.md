@@ -6,7 +6,7 @@ Demonstrates **OpenHands Cloud** integration with **GitHub** for autonomous inci
 
 ## Real-World Incident Scenarios
 
-The scenarios in this demo are based on [ITBench](https://github.com/itbench-hub/ITBench), a public benchmark for IT automation from IBM Research. These aren't toy examples - they represent real incident patterns that SRE teams face in production.
+The scenarios in this demo are based on [ITBench](https://github.com/itbench-hub/ITBench), a public benchmark for IT automation from IBM Research. These aren't toy examples. They represent real incident patterns that SRE teams face in production.
 
 ## What This Demo Shows
 
