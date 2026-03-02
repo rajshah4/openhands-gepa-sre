@@ -232,7 +232,10 @@ def get_all_service_status() -> str:
 if __name__ == "__main__":
     # Run with uvicorn for HTTP access
     import uvicorn
-    
+    from starlette.applications import Starlette
+    from starlette.responses import JSONResponse
+    from starlette.routing import Route, Mount
+
     print(f"Starting MCP Server on http://0.0.0.0:{PORT}")
     print(f"SSE endpoint: http://0.0.0.0:{PORT}/sse")
     print(f"Expose with: tailscale funnel {PORT}")
@@ -242,9 +245,29 @@ if __name__ == "__main__":
     print("  - fix_service1, fix_service2, fix_service3")
     print("  - get_all_service_status")
     print()
-    
-    # Get the ASGI app from FastMCP and run directly
-    # Note: FastMCP's DNS rebinding protection may reject non-localhost hosts
-    # The middleware approach had timing issues with SSE, so running direct
-    app = mcp.sse_app()
+
+    # Get the MCP SSE app
+    sse_app = mcp.sse_app()
+
+    # Health check endpoint at root - OpenHands Cloud probes this
+    async def health(request):
+        return JSONResponse({
+            "status": "ok",
+            "server": "sre-demo",
+            "sse_endpoint": "/sse",
+            "tools": [
+                "diagnose_service1", "diagnose_service2", "diagnose_service3",
+                "fix_service1", "fix_service2", "fix_service3",
+                "get_all_service_status",
+            ],
+        })
+
+    # Wrap MCP app with a root health endpoint
+    app = Starlette(
+        routes=[
+            Route("/", health),
+            Mount("/", app=sse_app),
+        ],
+    )
+
     uvicorn.run(app, host="0.0.0.0", port=PORT)
