@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acme Corp — Internal Analytics</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f1f5f9;color:#1e293b}
+        nav{background:#0f172a;color:#fff;padding:14px 32px;display:flex;align-items:center;justify-content:space-between}
+        nav .brand{font-weight:700;font-size:18px;display:flex;align-items:center;gap:10px}
+        nav .brand span{background:#3b82f6;padding:4px 10px;border-radius:6px;font-size:12px;font-weight:600}
+        nav .links{display:flex;gap:24px;font-size:14px}
+        nav .links a{color:#94a3b8;text-decoration:none}
+        nav .links a.on{color:#fff}
+        .pg{max-width:1100px;margin:0 auto;padding:28px 24px}
+        .ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+        .ph h1{font-size:24px;font-weight:700}
+        .ph .b{background:#dcfce7;color:#16a34a;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600}
+        .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+        .kpi{background:#fff;border-radius:12px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+        .kpi .l{font-size:12px;color:#64748b;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px}
+        .kpi .v{font-size:28px;font-weight:700}
+        .kpi .c{font-size:13px;margin-top:4px;color:#16a34a}
+        .panels{display:grid;grid-template-columns:2fr 1fr;gap:16px}
+        .pnl{background:#fff;border-radius:12px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+        .pnl h2{font-size:15px;font-weight:600;margin-bottom:16px;color:#334155}
+        table{width:100%;border-collapse:collapse;font-size:13px}
+        th{text-align:left;padding:8px 10px;color:#64748b;font-weight:600;border-bottom:2px solid #e2e8f0;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+        td{padding:10px;border-bottom:1px solid #f1f5f9}
+        .dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+        .dot.g{background:#16a34a}.dot.y{background:#eab308}
+        .br{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+        .br .bl{font-size:13px;color:#475569;width:100px}
+        .br .bt{flex:1;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden}
+        .br .bf{height:100%;border-radius:4px}
+        .br .bv{font-size:13px;font-weight:600;color:#1e293b;width:45px;text-align:right}
+        footer{text-align:center;padding:24px;font-size:12px;color:#94a3b8}
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="brand">Acme Corp <span>INTERNAL</span></div>
+        <div class="links">
+            <a href="#" class="on">Dashboard</a>
+            <a href="#">Pipelines</a>
+            <a href="#">Incidents</a>
+            <a href="#">Settings</a>
+        </div>
+    </nav>
+    <div class="pg">
+        <div class="ph">
+            <h1>Platform Analytics</h1>
+            <div class="b">&#9679; All Systems Operational</div>
+        </div>
+        <div class="kpis">
+            <div class="kpi"><div class="l">Requests / min</div><div class="v">12,847</div><div class="c">&#8593; 8.3% vs last week</div></div>
+            <div class="kpi"><div class="l">P99 Latency</div><div class="v">142 ms</div><div class="c">&#8595; 11 ms improved</div></div>
+            <div class="kpi"><div class="l">Error Rate</div><div class="v">0.02%</div><div class="c">&#8595; from 0.08%</div></div>
+            <div class="kpi"><div class="l">Uptime (30d)</div><div class="v">99.97%</div><div class="c">&#8593; SLA target met</div></div>
+        </div>
+        <div class="panels">
+            <div class="pnl">
+                <h2>Service Health</h2>
+                <table>
+                    <thead><tr><th>Service</th><th>Status</th><th>Latency</th><th>Throughput</th></tr></thead>
+                    <tbody>
+                        <tr><td>api-gateway</td><td><span class="dot g"></span>Healthy</td><td>23 ms</td><td>4,210 rpm</td></tr>
+                        <tr><td>auth-service</td><td><span class="dot g"></span>Healthy</td><td>45 ms</td><td>1,893 rpm</td></tr>
+                        <tr><td>payments-api</td><td><span class="dot g"></span>Healthy</td><td>67 ms</td><td>892 rpm</td></tr>
+                        <tr><td>notifications</td><td><span class="dot g"></span>Healthy</td><td>31 ms</td><td>2,104 rpm</td></tr>
+                        <tr><td>search-index</td><td><span class="dot y"></span>Degraded</td><td>210 ms</td><td>1,548 rpm</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="pnl">
+                <h2>Traffic by Region</h2>
+                <div class="br"><div class="bl">US East</div><div class="bt"><div class="bf" style="width:82%;background:#3b82f6"></div></div><div class="bv">38%</div></div>
+                <div class="br"><div class="bl">US West</div><div class="bt"><div class="bf" style="width:56%;background:#3b82f6"></div></div><div class="bv">26%</div></div>
+                <div class="br"><div class="bl">EU</div><div class="bt"><div class="bf" style="width:43%;background:#3b82f6"></div></div><div class="bv">20%</div></div>
+                <div class="br"><div class="bl">APAC</div><div class="bt"><div class="bf" style="width:26%;background:#3b82f6"></div></div><div class="bv">12%</div></div>
+                <div class="br"><div class="bl">Other</div><div class="bt"><div class="bf" style="width:9%;background:#94a3b8"></div></div><div class="bv">4%</div></div>
+            </div>
+        </div>
+    </div>
+    <footer>Acme Corp Internal Platform &middot; Refreshed automatically</footer>
+</body>
+</html>

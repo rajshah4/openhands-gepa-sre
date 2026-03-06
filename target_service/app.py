@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
+_DASHBOARD_HTML = (Path(__file__).parent / "templates" / "dashboard.html").read_text()
 
 # State files for each scenario
 LOCKFILE = "/tmp/service.lock"
@@ -294,12 +297,7 @@ def healthcheck_scenario(scenario: str):
             ), 500
         if wants_json():
             return jsonify({"status": "ok", "scenario": scenario}), 200
-        return render_html(
-            "ok",
-            "Service Running",
-            "All systems operational. The health-api is responding normally.",
-            scenario=scenario
-        ), 200
+        return _DASHBOARD_HTML, 200
 
     if scenario == "bad_env_config":
         if not os.getenv(REQUIRED_ENV):
@@ -314,7 +312,7 @@ def healthcheck_scenario(scenario: str):
             ), 500
         if wants_json():
             return jsonify({"status": "ok", "scenario": scenario}), 200
-        return render_html("ok", "Service Running", "Configuration loaded successfully.", scenario=scenario)
+        return _DASHBOARD_HTML, 200
 
     if scenario == "readiness_probe_fail":
         if not os.path.exists(READY_FILE):
@@ -329,7 +327,7 @@ def healthcheck_scenario(scenario: str):
             ), 500
         if wants_json():
             return jsonify({"status": "ok", "scenario": scenario}), 200
-        return render_html("ok", "Service Ready", "Readiness probe passing. Service is ready for traffic.", scenario=scenario)
+        return _DASHBOARD_HTML, 200
 
     if wants_json():
         return jsonify({"status": "error", "reason": f"unknown scenario {scenario}"}), 500

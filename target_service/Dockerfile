@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 RUN pip install --no-cache-dir flask==3.1.0
 
 COPY app.py /app/app.py
+COPY templates/ /app/templates/
 COPY start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
