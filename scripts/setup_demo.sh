@@ -63,7 +63,16 @@ if command -v tailscale &> /dev/null; then
         echo ""
         echo -n "Checking Tailscale Funnel... "
         if tailscale funnel status 2>&1 | grep -q "proxy"; then
-            FUNNEL_URL=$(tailscale funnel status 2>&1 | grep "https://" | head -1 | awk '{print $1}')
+            FUNNEL_URL=$(
+                tailscale funnel status 2>&1 \
+                    | grep -E '^https://' \
+                    | awk '{print $1}' \
+                    | grep -v ':8443$' \
+                    | head -1
+            )
+            if [ -z "$FUNNEL_URL" ]; then
+                FUNNEL_URL=$(tailscale funnel status 2>&1 | grep -E '^https://' | awk '{print $1}' | head -1)
+            fi
             echo -e "${GREEN}✓ Funnel is running${NC}"
             echo -e "   Public URL: ${GREEN}${FUNNEL_URL}${NC}"
         else
