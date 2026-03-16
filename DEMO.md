@@ -36,16 +36,10 @@ OpenHands Cloud calls these tools remotely to fix live services — no shell acc
 ```
 
 This builds the Docker image, starts the container on port 15000, and checks Tailscale.
+It also stages the live stale-lockfile demo by leaving `service1` broken, `service2` healthy, `service3` healthy, and starting the MCP server on port 8080.
+After that first bootstrap, use `./scripts/start_demo.sh` whenever you reboot and need the demo stack back.
 
-### 2. Start the MCP Server
-
-```bash
-uv run python mcp_server/server.py
-```
-
-The MCP server runs on port 8080 and exposes 7 tools (diagnose/fix for 3 services + status check). It supports both **streamable HTTP** (`/mcp`) and **SSE** (`/sse`) transports.
-
-### 3. Expose via Tailscale Funnel
+### 2. Expose via Tailscale Funnel
 
 ```bash
 # Expose both the demo service and MCP server
@@ -60,13 +54,13 @@ Your URLs:
 - **Demo service**: `https://your-machine.tailnet.ts.net/service1`
 - **MCP server**: `https://your-machine.tailnet.ts.net/mcp`
 
-### 4. Configure OpenHands Cloud
+### 3. Configure OpenHands Cloud
 
 1. Go to [app.all-hands.dev](https://app.all-hands.dev) → **Settings → MCP**
 2. Add your MCP URL: `https://your-machine.tailnet.ts.net/mcp`
 3. Cloud will connect using streamable HTTP transport (auto-appends `/sse` for SSE fallback)
 
-### 5. Verify MCP Works
+### 4. Verify MCP Works
 
 ```bash
 # Quick test — calls diagnose/fix/verify for all broken services
@@ -155,6 +149,130 @@ GitHub Issue ──→ OpenHands Cloud ──→ MCP: diagnose ──→ MCP: fi
 
 **After the fix:**
 > "Service is green. The agent diagnosed the issue, fixed it live, verified the fix, and documented everything in a PR. Same skills, same policies, at enterprise scale."
+
+---
+
+## Part 1.5: Jenkins Validation Add-On
+
+Use this only after the main MCP remediation flow is complete.
+
+### Positioning
+
+- OpenHands remains the actor that diagnoses and fixes the live incident.
+- Jenkins remains the enterprise validation gate teams already trust.
+- The story is integration, not replacement.
+
+### What Jenkins Does
+
+1. Checks out the PR branch that OpenHands created.
+2. Starts the demo stack locally with `./scripts/start_demo.sh`.
+3. Runs `./scripts/jenkins_verify_demo.sh`.
+4. Reports that the fixed stack, MCP endpoint, and integration tests all passed.
+
+### Demo Narrative
+
+> "OpenHands did the remediation. Jenkins now plays the familiar enterprise role: validate the branch, run smoke tests, and enforce the merge gate."
+
+### What to Show
+
+```bash
+./scripts/jenkins_verify_demo.sh
+```
+
+Or in Jenkins, point the job at the root `Jenkinsfile`.
+
+### Local Jenkins Setup
+
+If you need a self-contained Jenkins controller for the demo:
+
+```bash
+./scripts/start_jenkins_demo.sh
+```
+
+Then open `http://127.0.0.1:8081`, log in with `admin / admin`, create a Pipeline job, and point it at:
+
+```text
+/workspace/openhands-sre/Jenkinsfile
+```
+
+### One-Time GitHub Webhook Setup
+
+Automatic Jenkins-on-PR needs a one-time GitHub webhook setup:
+
+```bash
+python3 scripts/setup_github_jenkins_webhook.py
+```
+
+This registers:
+
+```text
+https://<your-tailscale-host>/mcp/github-webhook
+```
+
+If your public host changes, rerun the setup script.
+
+`./scripts/setup_demo.sh` now attempts this automatically when `gh` auth and Funnel are available.
+
+### Preflight Check
+
+Before the live demo, the normal command is:
+
+```bash
+./scripts/start_demo.sh
+```
+
+That starts the stack, starts Jenkins, and runs preflight automatically.
+
+If you only want to check readiness without restarting anything, run:
+
+```bash
+./scripts/demo_preflight.sh
+```
+
+This confirms the host app, local MCP, public MCP, Jenkins, GitHub auth, and GitHub webhook are all ready.
+
+### One-Command Full Demo
+
+If you want the issue creation and Jenkins trigger path in one command:
+
+```bash
+./scripts/run_full_github_jenkins_demo.sh
+```
+
+This will:
+1. Start the local Jenkins controller.
+2. Run the demo preflight.
+3. Break `service1`.
+4. Create the GitHub issue with the `openhands` label.
+5. Wait for the OpenHands PR.
+6. Let GitHub send the PR webhook automatically.
+7. Trigger Jenkins automatically when the PR appears.
+8. Post a Jenkins Check Run on the PR when supported, otherwise fall back to a commit status, and comment the result.
+
+### Troubleshooting
+
+- Preflight failing:
+  `./scripts/demo_preflight.sh`
+- One-time webhook setup or webhook repair:
+  `python3 scripts/setup_github_jenkins_webhook.py`
+- Jenkins not reachable:
+  `./scripts/start_jenkins_demo.sh`
+- PR exists but Jenkins not on the PR:
+  `gh pr view <pr-number> --json statusCheckRollup,comments,url`
+- Need webhook delivery history:
+  `gh api repos/rajshah4/openhands-sre/hooks`
+  `gh api repos/rajshah4/openhands-sre/hooks/<hook-id>/deliveries`
+- Need to verify Funnel routing:
+  `tailscale funnel status`
+- Need to inspect the webhook trigger log:
+  `tail -n 200 /tmp/github_webhook_jenkins.log`
+- Need to inspect the latest Jenkins run:
+  `curl -u admin:admin http://127.0.0.1:8081/job/openhands-sre-demo/lastBuild/consoleText`
+- Need to inspect local MCP:
+  `curl -i http://127.0.0.1:8080/`
+  `tail -n 200 /tmp/mcp_server.log`
+- Need to inspect the controller logs:
+  `docker logs --tail 200 openhands-sre-jenkins`
 
 ---
 
@@ -293,6 +411,7 @@ Show: Agent STOPPED, approval request, explicit human-only remediation
 
 ### MCP tools not connecting
 - Verify MCP server is running: `uv run python mcp_server/server.py`
+- Or restart the whole local stack: `./scripts/start_demo.sh`
 - Verify Tailscale Funnel: `tailscale funnel status`
 - Test MCP end-to-end: `uv run python scripts/test_mcp_agent.py --url https://your-machine.tailnet.ts.net/mcp`
 - Check MCP server logs: `tail -f /tmp/mcp_server.log`

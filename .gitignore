@@ -7,6 +7,8 @@ __pycache__/
 # Virtual env and local env
 .venv/
 .env
+.demo_webhook_secret
+.jenkins_home/
 
 # OS / editor
 .DS_Store

@@ -13,6 +13,8 @@ Expose with: tailscale funnel 8080
 """
 
 import json
+import hmac
+import hashlib
 import os
 import subprocess
 import sys
@@ -30,8 +32,14 @@ def _log_tool(name: str):
 
 # Lock down to only this container
 CONTAINER_NAME = "openhands-gepa-demo"
-LOCAL_URL = "http://127.0.0.1:15000"
+LOCAL_URL = os.getenv("DEMO_LOCAL_URL", "http://127.0.0.1:15000")
 PORT = 8080
+PORT = int(os.getenv("MCP_PORT", str(PORT)))
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+GITHUB_REPO = os.getenv("GITHUB_REPO", "rajshah4/openhands-sre")
+JENKINS_URL = os.getenv("JENKINS_URL", "http://127.0.0.1:8081")
+GITHUB_WEBHOOK_SECRET = os.getenv("GITHUB_WEBHOOK_SECRET", "")
+WEBHOOK_LOG = os.getenv("GITHUB_WEBHOOK_LOG", "/tmp/github_webhook_jenkins.log")
 
 # Base path for reverse proxy (e.g., "/mcp" when behind Tailscale Funnel)
 # This rewrites SSE endpoint URLs so MCP clients can find /messages/
@@ -69,6 +77,48 @@ def _check_service(path: str) -> dict[str, Any]:
         "http_code": http_code,
         "healthy": http_code == "200",
     }
+
+
+def _verify_github_signature(raw_body: bytes, signature_header: str | None) -> bool:
+    if not GITHUB_WEBHOOK_SECRET:
+        return False
+    if not signature_header or not signature_header.startswith("sha256="):
+        return False
+
+    expected = hmac.new(
+        GITHUB_WEBHOOK_SECRET.encode("utf-8"),
+        raw_body,
+        hashlib.sha256,
+    ).hexdigest()
+    provided = signature_header.split("=", 1)[1]
+    return hmac.compare_digest(expected, provided)
+
+
+def _spawn_jenkins_trigger(pr_number: int, head_sha: str | None) -> None:
+    os.makedirs(os.path.dirname(WEBHOOK_LOG), exist_ok=True)
+    cmd = [
+        sys.executable,
+        os.path.join(ROOT_DIR, "scripts", "github_to_jenkins.py"),
+        "--repo",
+        GITHUB_REPO,
+        "--pr",
+        str(pr_number),
+        "--jenkins-url",
+        JENKINS_URL,
+        "--comment-pr",
+    ]
+    if head_sha:
+        cmd.extend(["--sha", head_sha])
+
+    with open(WEBHOOK_LOG, "ab") as log_file:
+        log_file.write(f"\n[{datetime.now().isoformat()}] Triggering Jenkins for PR #{pr_number}\n".encode())
+        subprocess.Popen(
+            cmd,
+            cwd=ROOT_DIR,
+            stdout=log_file,
+            stderr=log_file,
+            start_new_session=True,
+        )
 
 
 @mcp.tool()
@@ -335,8 +385,50 @@ if __name__ == "__main__":
             ],
         })
 
+    async def github_webhook(request):
+        if not GITHUB_WEBHOOK_SECRET:
+            return JSONResponse({"status": "error", "reason": "GITHUB_WEBHOOK_SECRET not configured"}, status_code=503)
+
+        raw_body = await request.body()
+        signature = request.headers.get("x-hub-signature-256")
+        if not _verify_github_signature(raw_body, signature):
+            return JSONResponse({"status": "error", "reason": "invalid signature"}, status_code=401)
+
+        event = request.headers.get("x-github-event", "")
+        if event == "ping":
+            return JSONResponse({"status": "ok", "message": "pong"})
+        if event != "pull_request":
+            return JSONResponse({"status": "ignored", "event": event})
+
+        payload = json.loads(raw_body.decode("utf-8"))
+        action = payload.get("action", "")
+        if action not in {"opened", "reopened", "synchronize", "ready_for_review"}:
+            return JSONResponse({"status": "ignored", "action": action})
+
+        repo_full_name = payload.get("repository", {}).get("full_name")
+        if repo_full_name and repo_full_name != GITHUB_REPO:
+            return JSONResponse({"status": "ignored", "repo": repo_full_name})
+
+        pr = payload.get("pull_request") or {}
+        pr_number = pr.get("number")
+        head_sha = (pr.get("head") or {}).get("sha")
+        if not pr_number:
+            return JSONResponse({"status": "error", "reason": "missing pull request number"}, status_code=400)
+
+        _spawn_jenkins_trigger(pr_number, head_sha)
+        return JSONResponse(
+            {
+                "status": "accepted",
+                "repo": GITHUB_REPO,
+                "pr": pr_number,
+                "action": action,
+            },
+            status_code=202,
+        )
+
     # Add health and SSE routes to the streamable HTTP app
     http_app.routes.insert(0, Route("/", health))
+    http_app.routes.append(Route("/github-webhook", github_webhook, methods=["POST"]))
     http_app.routes.append(Mount("/sse-transport", app=sse_app))
 
     app = http_app
