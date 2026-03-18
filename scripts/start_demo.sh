@@ -1,7 +1,6 @@
 #!/bin/bash
 # Restart-safe demo launcher: starts the Docker service, MCP server, local
-# Jenkins controller, verifies the baseline, and optionally breaks a service
-# for a live remediation demo.
+# Jenkins controller, verifies a healthy baseline, and then stages the demo.
 
 set -euo pipefail
 
@@ -22,10 +21,11 @@ RUN_PREFLIGHT="${RUN_PREFLIGHT:-1}"
 
 REBUILD_IMAGE=0
 BREAK_SCENARIO=""
+LEAVE_HEALTHY=0
 
 usage() {
     cat <<'EOF'
-Usage: ./scripts/start_demo.sh [--rebuild] [--break service1|service2|all]
+Usage: ./scripts/start_demo.sh [--rebuild] [--healthy] [--break service1|service2|service3|all]
 
 Starts the local demo stack after a reboot:
   - ensures the Docker image exists
@@ -33,12 +33,15 @@ Starts the local demo stack after a reboot:
   - starts the MCP server on port 8080 in the background
   - starts the local Jenkins controller on port 8081
   - runs the demo preflight checks
+  - stages all three services as broken by default
 
 Options:
   --rebuild               Rebuild the Docker image before starting
+  --healthy               Leave all services healthy after startup
   --break service1        Create /tmp/service.lock in the container
   --break service2        Remove /tmp/ready.flag in the container
-  --break all             Break both service1 and service2
+  --break service3        Restart without REQUIRED_API_KEY
+  --break all             Break service1, service2, and service3
   -h, --help              Show this help text
 EOF
 }
@@ -47,6 +50,11 @@ while [[ $# -gt 0 ]]; do
     case "$1" in
         --rebuild)
             REBUILD_IMAGE=1
+            shift
+            ;;
+        --healthy)
+            LEAVE_HEALTHY=1
+            BREAK_SCENARIO=""
             shift
             ;;
         --break)
@@ -69,6 +77,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [[ "$LEAVE_HEALTHY" -eq 0 ]] && [[ -z "$BREAK_SCENARIO" ]]; then
+    BREAK_SCENARIO="all"
+fi
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -105,9 +117,15 @@ ensure_image() {
 }
 
 restart_container() {
+    local include_api_key="${1:-1}"
+
     echo "Recreating demo container..."
     docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-    docker run -d -p "${APP_PORT}:5000" -e REQUIRED_API_KEY=secret --name "$CONTAINER_NAME" "$IMAGE_NAME" >/dev/null
+    if [[ "$include_api_key" == "1" ]]; then
+        docker run -d -p "${APP_PORT}:5000" -e REQUIRED_API_KEY=secret --name "$CONTAINER_NAME" "$IMAGE_NAME" >/dev/null
+    else
+        docker run -d -p "${APP_PORT}:5000" --name "$CONTAINER_NAME" "$IMAGE_NAME" >/dev/null
+    fi
     wait_for_http "http://${APP_HOST}:${APP_PORT}/" "Demo service"
     docker exec "$CONTAINER_NAME" touch /tmp/ready.flag >/dev/null
 }
@@ -168,8 +186,13 @@ break_services() {
             echo "Breaking service2 (missing readiness flag)..."
             docker exec "$CONTAINER_NAME" rm -f /tmp/ready.flag >/dev/null
             ;;
+        service3)
+            echo "Breaking service3 (missing REQUIRED_API_KEY)..."
+            restart_container 0
+            ;;
         all)
-            echo "Breaking service1 and service2..."
+            echo "Breaking service1, service2, and service3..."
+            restart_container 0
             docker exec "$CONTAINER_NAME" touch /tmp/service.lock >/dev/null
             docker exec "$CONTAINER_NAME" rm -f /tmp/ready.flag >/dev/null
             ;;
@@ -208,7 +231,7 @@ fi
 
 echo "Starting OpenHands SRE demo..."
 ensure_image
-restart_container
+restart_container 1
 start_mcp_server
 if [[ "$RUN_LOCAL_JENKINS" -eq 1 ]]; then
     echo "Starting Jenkins controller..."
@@ -254,7 +277,10 @@ if [[ "$RUN_PREFLIGHT" -eq 1 ]] && [[ -f "$WEBHOOK_SECRET_FILE" ]]; then
 fi
 echo
 echo "Next steps:"
+echo "  Start healthy:    ./scripts/start_demo.sh --healthy"
 echo "  Break service1:   docker exec ${CONTAINER_NAME} touch /tmp/service.lock"
+echo "  Break service2:   docker exec ${CONTAINER_NAME} rm -f /tmp/ready.flag"
+echo "  Break service3:   docker rm -f ${CONTAINER_NAME} && docker run -d -p ${APP_PORT}:5000 --name ${CONTAINER_NAME} ${IMAGE_NAME}"
 echo "  Test MCP path:    uv run python scripts/test_mcp_agent.py"
 echo "  Jenkins checks:   START_STACK=0 ./scripts/jenkins_verify_demo.sh"
 echo "  Watch MCP calls:  tail -f ${MCP_LOG}"

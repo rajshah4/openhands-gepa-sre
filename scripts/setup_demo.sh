@@ -212,6 +212,11 @@ docker exec "$CONTAINER_NAME" touch /tmp/service.lock >/dev/null
 echo -e "${GREEN}✓ service1 broken, service2/service3 healthy${NC}"
 
 ensure_mcp_server
+
+echo ""
+echo "Refreshing Jenkins demo image and controller..."
+"$ROOT_DIR/scripts/start_jenkins_demo.sh" --rebuild
+
 check_tailscale
 configure_github_webhook
 

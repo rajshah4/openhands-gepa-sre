@@ -42,7 +42,7 @@ require_cmd uv
 cd "$ROOT_DIR"
 
 if [[ "$START_STACK" == "1" ]]; then
-    ./scripts/start_demo.sh
+    ./scripts/start_demo.sh --healthy
 fi
 
 echo "Running Jenkins validation against the live demo stack..."

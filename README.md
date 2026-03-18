@@ -105,6 +105,7 @@ Use:
 
 when you want the fuller bootstrap flow. It:
 - rebuilds the target image
+- rebuilds the Jenkins demo image
 - stages the stale-lockfile scenario
 - checks Tailscale Funnel
 - attempts GitHub webhook setup when `gh` auth and Funnel are available
@@ -115,7 +116,7 @@ Use:
 ./scripts/start_demo.sh
 ```
 
-for normal pre-demo startup and verification.
+for normal pre-demo startup and verification. It now leaves all three demo services broken by default so the browser starts in the incident state.
 
 ### After a Restart
 
@@ -128,10 +129,11 @@ Use a single command:
 This is the normal pre-demo command. It:
 - recreates the demo container
 - starts the MCP server
-- starts the local Jenkins controller
+- starts the local Jenkins controller using the existing Jenkins image
 - runs the full preflight, including the GitHub webhook check
+- then stages `service1`, `service2`, and `service3` as broken for the live demo
 
-For a live incident right away, use `./scripts/start_demo.sh --break service1`.
+If you need a clean baseline instead, use `./scripts/start_demo.sh --healthy`.
 
 ### Jenkins Add-On
 

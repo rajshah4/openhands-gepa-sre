@@ -23,7 +23,7 @@ pipeline {
 
     stage('Start Demo Stack') {
       steps {
-        sh 'export PATH="$DEMO_PATH:$PATH"; cd "$DEMO_REPO" && APP_HOST="$APP_HOST" MCP_HOST="$MCP_HOST" MCP_PORT="$MCP_PORT" PYTHON_BIN="$UV_PROJECT_ENVIRONMENT/bin/python" RUN_LOCAL_JENKINS=0 RUN_PREFLIGHT=0 ./scripts/start_demo.sh'
+        sh 'export PATH="$DEMO_PATH:$PATH"; cd "$DEMO_REPO" && APP_HOST="$APP_HOST" MCP_HOST="$MCP_HOST" MCP_PORT="$MCP_PORT" PYTHON_BIN="$UV_PROJECT_ENVIRONMENT/bin/python" RUN_LOCAL_JENKINS=0 RUN_PREFLIGHT=0 ./scripts/start_demo.sh --healthy'
       }
     }
 

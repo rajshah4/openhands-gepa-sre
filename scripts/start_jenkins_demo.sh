@@ -10,6 +10,37 @@ HOST_PORT="${JENKINS_PORT:-8081}"
 AGENT_PORT="${JENKINS_AGENT_PORT:-50001}"
 JENKINS_HOME_DIR="${ROOT_DIR}/.jenkins_home"
 WORKSPACE_DIR="${ROOT_DIR}"
+REBUILD_IMAGE=0
+
+usage() {
+    cat <<'EOF'
+Usage: ./scripts/start_jenkins_demo.sh [--rebuild]
+
+Starts the local Jenkins controller for the demo.
+
+Options:
+  --rebuild   Rebuild the Jenkins image before starting
+  -h, --help  Show this help text
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --rebuild)
+            REBUILD_IMAGE=1
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        *)
+            echo "Unknown argument: $1" >&2
+            usage
+            exit 1
+            ;;
+    esac
+done
 
 require_cmd() {
     if ! command -v "$1" >/dev/null 2>&1; then
@@ -43,8 +74,12 @@ mkdir -p "$JENKINS_HOME_DIR"
 mkdir -p "$JENKINS_HOME_DIR/init.groovy.d"
 cp "$ROOT_DIR"/jenkins/init.groovy.d/*.groovy "$JENKINS_HOME_DIR/init.groovy.d/"
 
-echo "Building Jenkins demo image..."
-docker build -t "$IMAGE_NAME" "$ROOT_DIR/jenkins"
+if [[ "$REBUILD_IMAGE" -eq 1 ]] || ! docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+    echo "Building Jenkins demo image..."
+    docker build -t "$IMAGE_NAME" "$ROOT_DIR/jenkins"
+else
+    echo "Reusing existing Jenkins demo image: $IMAGE_NAME"
+fi
 
 echo "Starting Jenkins demo container..."
 docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true

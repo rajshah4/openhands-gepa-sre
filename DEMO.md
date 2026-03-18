@@ -36,8 +36,8 @@ OpenHands Cloud calls these tools remotely to fix live services — no shell acc
 ```
 
 This builds the Docker image, starts the container on port 15000, and checks Tailscale.
-It also stages the live stale-lockfile demo by leaving `service1` broken, `service2` healthy, `service3` healthy, and starting the MCP server on port 8080.
-After that first bootstrap, use `./scripts/start_demo.sh` whenever you reboot and need the demo stack back.
+It also rebuilds the local Jenkins demo image, stages the live stale-lockfile demo by leaving `service1` broken, `service2` healthy, `service3` healthy, and starts the MCP server on port 8080.
+After that first bootstrap, use `./scripts/start_demo.sh` whenever you reboot and need the demo stack back. `start_demo.sh` now runs preflight against a healthy baseline and then leaves all three services broken by default for the live demo. Use `./scripts/start_demo.sh --healthy` when you want a clean baseline instead.
 
 ### 2. Expose via Tailscale Funnel
 
