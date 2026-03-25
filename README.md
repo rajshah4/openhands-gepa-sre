@@ -95,6 +95,19 @@ uv run python scripts/test_mcp_agent.py
 uv run python scripts/test_mcp_agent.py --url https://your-machine.tailnet.ts.net/mcp
 ```
 
+### Verify Cloud Trigger Path
+
+```bash
+# Creates a disposable labeled issue and waits for the OpenHands bot reply.
+# This catches expired-session / failed-conversation-init problems before a demo.
+# Run this separately from setup/start when you want a real live Cloud trigger test.
+uv run python scripts/test_cloud_trigger.py
+```
+
+`./scripts/setup_demo.sh` and `./scripts/start_demo.sh` prepare the local demo stack.
+They do not prove that OpenHands Cloud can still initialize a fresh GitHub-triggered conversation.
+Use `uv run python scripts/test_cloud_trigger.py` when you want that live end-to-end check.
+
 ### Setup vs Start
 
 Use:

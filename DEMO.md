@@ -403,6 +403,7 @@ Show: Agent STOPPED, approval request, explicit human-only remediation
 ### Issue not picked up by Cloud
 - Check `openhands` label is on the issue
 - Verify Cloud has access to the repo at [app.all-hands.dev](https://app.all-hands.dev)
+- Run `uv run python scripts/test_cloud_trigger.py` to verify a fresh labeled issue can still start an OpenHands Cloud conversation
 
 ### Agent diagnoses but doesn't fix
 - Verify skills in `.agents/skills/` say "Call the fix tool NOW" (not "if available")
