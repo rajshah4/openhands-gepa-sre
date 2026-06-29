@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from flask import Flask, jsonify, request
@@ -15,6 +16,46 @@ REQUIRED_ENV = "REQUIRED_API_KEY"
 
 # Legacy support for single-scenario mode
 SCENARIO = os.getenv("SCENARIO", "")
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+log = logging.getLogger("pets")
+
+
+# --- Pet adoption catalog -------------------------------------------------
+#
+# Only pets whose status is "available" may ever be shown to customers in the
+# adoptable catalog. A pet that is "pending" (adoption in progress) or
+# "adopted" must be hidden. The catalog must filter on status so that pending
+# pets such as Nova never surface to customers (KAN-24, recurring symptom:
+# customers seeing and starting adoption flows for pets not yet available).
+
+AVAILABLE = "available"
+PENDING = "pending"
+ADOPTED = "adopted"
+
+PETS: list[dict] = [
+    {"id": 1, "name": "Luna", "species": "dog", "status": AVAILABLE},
+    {"id": 2, "name": "Milo", "species": "cat", "status": AVAILABLE},
+    {"id": 3, "name": "Nova", "species": "dog", "status": PENDING},
+    {"id": 4, "name": "Bella", "species": "rabbit", "status": ADOPTED},
+    {"id": 5, "name": "Charlie", "species": "dog", "status": AVAILABLE},
+]
+
+
+def available_pets() -> list[dict]:
+    """Return only pets that customers may adopt.
+
+    Non-available pets (pending/adopted) are deliberately excluded. Each one
+    that is filtered out is logged so a leak would surface as a distinct
+    PET_HIDDEN line instead of silently appearing to customers.
+    """
+    visible: list[dict] = []
+    for pet in PETS:
+        if pet["status"] == AVAILABLE:
+            visible.append(pet)
+        else:
+            log.info("PET_HIDDEN pet_id=%s name=%s status=%s", pet["id"], pet["name"], pet["status"])
+    return visible
 
 
 def render_html(status: str, title: str, message: str, details: str = "", scenario: str = "") -> str:
@@ -280,6 +321,55 @@ def ready_scenario():
 @app.route("/config")
 def config_scenario():
     return healthcheck_scenario("bad_env_config")
+
+
+# --- Pet adoption catalog endpoints --------------------------------------
+
+@app.route("/pets")
+@app.route("/api/pets")
+def pets():
+    """Return the adoptable pet catalog.
+
+    Only pets with status == "available" are returned. Pending and adopted
+    pets (e.g. Nova, who is pending) must never appear here.
+    """
+    visible = available_pets()
+    if wants_json():
+        return jsonify({"status": "ok", "count": len(visible), "pets": visible}), 200
+    return render_pet_catalog(visible)
+
+
+def render_pet_catalog(visible: list[dict]) -> str:
+    """Render a simple HTML catalog of adoptable pets."""
+    rows = "\n".join(
+        f"<tr><td>{p['id']}</td><td>{p['name']}</td><td>{p['species']}</td></tr>"
+        for p in visible
+    ) or '<tr><td colspan="3">No pets available</td></tr>'
+    return f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adoptable Pets</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:#f8fafc; color:#1e293b; padding:40px; }}
+        h1 {{ font-size:28px; margin-bottom:8px; }}
+        p.sub {{ color:#64748b; margin-bottom:24px; }}
+        table {{ border-collapse:collapse; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.06); border-radius:12px; overflow:hidden; width:100%; max-width:600px; }}
+        th {{ text-align:left; padding:12px 16px; background:#0f172a; color:#fff; font-size:13px; text-transform:uppercase; letter-spacing:.5px; }}
+        td {{ padding:12px 16px; border-bottom:1px solid #f1f5f9; }}
+        tr:last-child td {{ border-bottom:none; }}
+    </style>
+</head>
+<body>
+    <h1>Adoptable Pets</h1>
+    <p class="sub">Pets currently available for adoption.</p>
+    <table>
+        <thead><tr><th>ID</th><th>Name</th><th>Species</th></tr></thead>
+        <tbody>{rows}</tbody>
+    </table>
+</body>
+</html>'''
 
 
 def healthcheck_scenario(scenario: str):
